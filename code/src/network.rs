@@ -102,11 +102,13 @@ impl NetworkManager {
         while i < lines.len() {
             let line = lines[i].trim();
             
-            // 匹配接口行: "2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> ..."
-            if let Some(colon_pos) = line.find(':') {
-                if let Some(second_colon) = line[colon_pos + 1..].find(':') {
-                    let name_part = &line[colon_pos + 1..colon_pos + 1 + second_colon];
-                    let name = name_part.trim().to_string();
+            // 只匹配接口头行: "2: eth0: <BROADCAST,MULTICAST,UP,LOWER_UP> ..."
+            // 避免把 "link/ether 00:..." 这类包含 ':' 的 MAC 行误识别为接口行
+            let parts: Vec<&str> = line.splitn(3, ':').collect();
+            if parts.len() >= 3 {
+                let idx = parts[0].trim();
+                if idx.parse::<u32>().is_ok() {
+                    let name = parts[1].trim().to_string();
                     
                     // 跳过 lo (loopback)
                     if name == "lo" {
@@ -234,8 +236,13 @@ impl NetworkManager {
                         let address = addr_parts[0].to_string();
                         let prefix_len = addr_parts[1].parse::<u8>().unwrap_or(64);
                         
-                        // 解析作用域
-                        let scope = parts[2].to_string();
+                        // 解析作用域: "scope <value>"，例如: "scope global" / "scope link"
+                        let scope = parts
+                            .iter()
+                            .position(|p| *p == "scope")
+                            .and_then(|pos| parts.get(pos + 1))
+                            .map(|s| (*s).to_string())
+                            .unwrap_or_else(|| "unknown".to_string());
                         
                         // 检查是否是临时地址
                         let is_temporary = line.contains("temporary") || line.contains("deprecated");
