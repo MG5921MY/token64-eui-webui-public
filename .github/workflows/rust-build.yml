@@ -76,10 +76,22 @@ jobs:
         with:
           path: artifacts
       
+      - name: Prepare release assets
+        run: |
+          set -euo pipefail
+          mkdir -p dist
+          for d in artifacts/*; do
+            if [ -d "$d" ] && [ -f "$d/ipv6-token-webui" ]; then
+              name="$(basename "$d")"
+              target="${name#ipv6-token-webui-}"
+              cp "$d/ipv6-token-webui" "dist/ipv6-token-webui-${target}"
+            fi
+          done
+      
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          files: artifacts/**/*
+          files: dist/*
           generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
