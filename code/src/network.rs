@@ -220,6 +220,54 @@ impl NetworkManager {
         info!("找到 {} 个 IPv6 地址", addresses.len());
         Ok(addresses)
     }
+
+    pub async fn get_ra_prefix_length(interface: &str) -> Result<Option<u8>> {
+        info!("获取接口 {} 的 RA 前缀长度", interface);
+
+        let output = timeout(
+            Duration::from_secs(5),
+            tokio::process::Command::new("ip")
+                .args(&["-6", "route", "show", "dev", interface])
+                .output(),
+        )
+        .await
+        .context("获取 IPv6 路由表超时")?
+        .context("执行 ip -6 route show 失败")?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            anyhow::bail!("ip -6 route show 失败: {}", stderr);
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        Ok(Self::parse_ra_prefix_length(&stdout))
+    }
+
+    fn parse_ra_prefix_length(output: &str) -> Option<u8> {
+        for line in output.lines() {
+            let line = line.trim();
+            if line.is_empty() {
+                continue;
+            }
+
+            if !line.contains(" proto ra ") {
+                continue;
+            }
+
+            let first = line.split_whitespace().next()?;
+            let mut it = first.split('/');
+            let _prefix = it.next()?;
+            let len_str = it.next()?;
+            if len_str.is_empty() {
+                continue;
+            }
+
+            if let Ok(len) = len_str.parse::<u8>() {
+                return Some(len);
+            }
+        }
+        None
+    }
     
     /// 解析 IPv6 地址输出
     fn parse_ipv6_addresses(output: &str) -> Result<Vec<IPv6Address>> {
@@ -412,5 +460,18 @@ mod tests {
         assert_eq!(addresses[0].scope, "global");
         assert!(!addresses[0].is_temporary);
         assert!(addresses[2].is_temporary);
+    }
+
+    #[test]
+    fn test_parse_ra_prefix_length() {
+        let output = r#"
+240e:b65:48a:ab01::c36 proto kernel metric 100 pref medium
+240e:b65:48a:ab01::/64 proto ra metric 100 pref medium
+fe80::/64 proto kernel metric 1024 pref medium
+default via fe80::a9b:4bff:fe15:846e proto ra metric 100 pref medium
+"#;
+
+        let prefix = NetworkManager::parse_ra_prefix_length(output);
+        assert_eq!(prefix, Some(64));
     }
 }

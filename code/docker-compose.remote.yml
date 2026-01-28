@@ -19,4 +19,4 @@ services:
     # command: ["-H", "127.0.0.1", "-p", "5000"]  # 仅本地访问（最安全）
     labels:
       - "description=IPv6 Token WebUI - 远程镜像版本"
-      - "version=1.0.0"
+      - "version=1.0.1"

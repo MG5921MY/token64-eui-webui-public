@@ -22,4 +22,4 @@ services:
     # 详细配置: 查看 NETWORK_CONFIG.md
     labels:
       - "description=IPv6 Token WebUI - 本地构建版本"
-      - "version=1.0.0"
+      - "version=1.0.1"

@@ -259,11 +259,22 @@ pub async fn get_prefix_info(
         }
     };
     
-    // 3. 检测前缀长度（从第一个全局地址）
-    let detected_prefix = addresses.iter()
+    // 3. 检测前缀长度：优先从路由器 RA 下发前缀（ip -6 route proto ra），避免 /128 host 地址误判
+    let ra_prefix = match NetworkManager::get_ra_prefix_length(&query.interface).await {
+        Ok(v) => v,
+        Err(e) => {
+            warn!("获取 RA 前缀长度失败: {}", e);
+            None
+        }
+    };
+
+    // 回退：从第一个全局非临时地址推断
+    let addr_prefix = addresses
+        .iter()
         .find(|addr| addr.scope == "global" && !addr.is_temporary)
-        .map(|addr| addr.prefix_len)
-        .unwrap_or(64); // 默认 /64
+        .map(|addr| addr.prefix_len);
+
+    let detected_prefix = ra_prefix.or(addr_prefix).unwrap_or(64); // 默认 /64
     
     // 4. 计算建议后缀长度
     let suggested_suffix = if detected_prefix <= 64 {

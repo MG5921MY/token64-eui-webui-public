@@ -1,6 +1,6 @@
 [package]
 name = "ipv6-token-webui"
-version = "1.0.0"
+version = "1.0.1"
 edition = "2021"
 authors = ["clearlove.ymg"]
 description = "Web UI for managing IPv6 Token configuration on Linux NetworkManager"
