@@ -1,0 +1,51 @@
+# IPv6 Token WebUI 配置文件示例
+# 复制此文件到 config/config.yaml 并根据需要修改
+
+# 服务器配置
+server:
+  # 监听地址
+  # - "127.0.0.1": 仅本地访问（推荐，最安全）
+  # - "0.0.0.0": 允许所有网络接口访问（需要配置防火墙）
+  host: "127.0.0.1"
+  
+  # 监听端口
+  port: 5000
+
+# 认证配置
+auth:
+  # 密码哈希（Argon2id 格式）
+  # 默认密码: admin
+  # 使用 CLI 命令修改: ./ipv6-token-webui --set-password
+  password_hash: "$argon2id$v=19$m=19456,t=2,p=1$c29tZXNhbHQxMjM0NTY3OA$8lE0W8NeHvqL8F8qH5qH5qH5qH5qH5qH5qH5qH5qH5o"
+  
+  # 会话超时时间（分钟）
+  # 用户在此时间内无操作将自动登出
+  session_timeout_minutes: 30
+  
+  # 最大登录尝试次数
+  # 超过此次数将锁定 IP 地址
+  max_login_attempts: 5
+  
+  # IP 锁定时间（分钟）
+  # 登录失败次数过多后的锁定时长
+  lockout_duration_minutes: 15
+
+# 路径配置（通常不需要修改）
+paths:
+  # Shell 脚本目录（保留用于向后兼容）
+  script_dir: "./sh/token-eui64"
+  
+  # 前端静态文件目录（已嵌入到二进制文件）
+  frontend_dir: "./frontend"
+
+# 日志配置
+logging:
+  # 日志级别: trace, debug, info, warn, error
+  level: "info"
+
+# 安全建议：
+# 1. 首次启动后立即修改默认密码
+# 2. 使用强密码（至少 12 位，包含大小写字母、数字和特殊字符）
+# 3. 如果需要远程访问，使用反向代理（如 Nginx）并启用 HTTPS
+# 4. 定期检查日志文件，监控异常登录尝试
+# 5. 在生产环境中，将 host 设置为 "127.0.0.1" 并通过反向代理访问

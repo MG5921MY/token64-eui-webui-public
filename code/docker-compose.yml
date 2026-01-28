@@ -1,0 +1,26 @@
+services:
+  ipv6-token-webui:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: ipv6-token-webui
+    network_mode: host
+    cap_add:
+      - NET_ADMIN
+    restart: unless-stopped
+    volumes:
+      - ./config:/app/config
+      - /var/run/dbus:/var/run/dbus:ro  # 挂载 D-Bus socket 以访问 NetworkManager
+      - /run/NetworkManager:/run/NetworkManager:ro  # 挂载 NetworkManager 运行时目录
+    environment:
+      - LOG_LEVEL=info
+    # 监听地址配置说明:
+    # - 默认: 容器内监听 0.0.0.0（Dockerfile 中配置）
+    # - 修改: 取消下面注释并修改监听地址
+    # command: ["-H", "127.0.0.1"]  # 仅本地访问（最安全）
+    # command: ["-H", "0.0.0.0"]    # 所有接口（需防火墙）
+    # 详细配置: 查看 NETWORK_CONFIG.md
+    labels:
+      - "description=IPv6 Token WebUI"
+      - "version=1.0.0"
+

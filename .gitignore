@@ -1,0 +1,32 @@
+# Rust
+/target/
+**/*.rs.bk
+# Cargo.lock - 二进制项目应该提交此文件
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.kiro/
+
+# OS
+.DS_Store
+Thumbs.db
+desktop.ini
+
+# Logs
+*.log
+
+# Environment
+.env
+.env.local
+
+# Build artifacts
+/code/target/
+/code/releases/
+
+# Temporary files
+*.tmp
+*.temp

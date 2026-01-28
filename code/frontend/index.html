@@ -1,0 +1,1532 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>IPv6 Token WebUI - Linux NetworkManager</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;600;700&family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        /* 深色主题（默认） */
+        :root[data-theme="dark"] {
+            --bg-primary: #0a0e27;
+            --bg-secondary: #141b3a;
+            --bg-card: rgba(20, 27, 58, 0.6);
+            --accent-cyan: #00d9ff;
+            --accent-orange: #ff6b35;
+            --accent-green: #00ff88;
+            --text-primary: #e8edf4;
+            --text-secondary: #8b95b0;
+            --border-color: rgba(0, 217, 255, 0.2);
+            --shadow-glow: 0 0 30px rgba(0, 217, 255, 0.3);
+            --grid-color: rgba(0, 217, 255, 0.03);
+            --orb-opacity: 0.4;
+        }
+        
+        /* 浅色主题 */
+        :root[data-theme="light"] {
+            --bg-primary: #f5f7fa;
+            --bg-secondary: #ffffff;
+            --bg-card: rgba(255, 255, 255, 0.8);
+            --accent-cyan: #0099cc;
+            --accent-orange: #ff6b35;
+            --accent-green: #00cc70;
+            --text-primary: #1a202c;
+            --text-secondary: #4a5568;
+            --border-color: rgba(0, 153, 204, 0.2);
+            --shadow-glow: 0 0 30px rgba(0, 153, 204, 0.2);
+            --grid-color: rgba(0, 153, 204, 0.05);
+            --orb-opacity: 0.15;
+        }
+        
+        body {
+            font-family: 'Outfit', sans-serif;
+            background: var(--bg-primary);
+            color: var(--text-primary);
+            min-height: 100vh;
+            overflow-x: hidden;
+            position: relative;
+            transition: background 0.3s ease, color 0.3s ease;
+        }
+        
+        /* 动态网格背景 */
+        body::before {
+            content: '';
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-image: 
+                linear-gradient(var(--grid-color) 1px, transparent 1px),
+                linear-gradient(90deg, var(--grid-color) 1px, transparent 1px);
+            background-size: 50px 50px;
+            z-index: 0;
+            animation: gridMove 20s linear infinite;
+        }
+        
+        @keyframes gridMove {
+            0% { transform: translate(0, 0); }
+            100% { transform: translate(50px, 50px); }
+        }
+        
+        /* 发光球体装饰 */
+        .orb {
+            position: fixed;
+            border-radius: 50%;
+            filter: blur(80px);
+            opacity: var(--orb-opacity);
+            z-index: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+        }
+        
+        .orb-1 {
+            width: 400px;
+            height: 400px;
+            background: var(--accent-cyan);
+            top: -200px;
+            right: -200px;
+            animation: float 15s ease-in-out infinite;
+        }
+        
+        .orb-2 {
+            width: 300px;
+            height: 300px;
+            background: var(--accent-orange);
+            bottom: -150px;
+            left: -150px;
+            animation: float 20s ease-in-out infinite reverse;
+        }
+        
+        @keyframes float {
+            0%, 100% { transform: translate(0, 0) scale(1); }
+            50% { transform: translate(50px, 50px) scale(1.1); }
+        }
+        
+        .container {
+            position: relative;
+            z-index: 1;
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 40px 20px;
+        }
+        
+        /* 主题切换开关 */
+        .theme-toggle-container {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            z-index: 1000;
+        }
+        
+        .theme-toggle {
+            position: relative;
+            width: 70px;
+            height: 34px;
+            background: var(--bg-card);
+            border: 2px solid var(--border-color);
+            border-radius: 34px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            backdrop-filter: blur(10px);
+        }
+        
+        .theme-toggle:hover {
+            border-color: var(--accent-cyan);
+            box-shadow: var(--shadow-glow);
+        }
+        
+        .theme-toggle-slider {
+            position: absolute;
+            top: 3px;
+            left: 3px;
+            width: 24px;
+            height: 24px;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-green));
+            border-radius: 50%;
+            transition: transform 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 14px;
+        }
+        
+        .theme-toggle.light .theme-toggle-slider {
+            transform: translateX(36px);
+        }
+        
+        /* 标题区域 */
+        .header {
+            text-align: center;
+            margin-bottom: 60px;
+            animation: fadeInDown 0.8s ease-out;
+        }
+        
+        .header h1 {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 3rem;
+            font-weight: 700;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-green));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            margin-bottom: 12px;
+            letter-spacing: -2px;
+        }
+        
+        .header .subtitle {
+            font-size: 1.1rem;
+            color: var(--text-secondary);
+            font-weight: 300;
+        }
+        
+        .header .status-badge {
+            display: inline-block;
+            margin-top: 16px;
+            padding: 8px 20px;
+            background: rgba(0, 255, 136, 0.1);
+            border: 1px solid var(--accent-green);
+            border-radius: 20px;
+            font-size: 0.85rem;
+            font-family: 'JetBrains Mono', monospace;
+            color: var(--accent-green);
+        }
+        
+        /* 卡片样式 */
+        .card {
+            background: var(--bg-card);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 40px;
+            margin-bottom: 30px;
+            position: relative;
+            overflow: hidden;
+            transition: all 0.3s ease;
+        }
+        
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, var(--accent-cyan), transparent);
+            opacity: 0;
+            transition: opacity 0.3s ease;
+        }
+        
+        .card:hover::before {
+            opacity: 1;
+        }
+        
+        .card:hover {
+            border-color: var(--accent-cyan);
+            box-shadow: var(--shadow-glow);
+            transform: translateY(-2px);
+        }
+        
+        .card-title {
+            font-size: 1.5rem;
+            font-weight: 600;
+            margin-bottom: 30px;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+        
+        .card-title::before {
+            content: '';
+            width: 4px;
+            height: 24px;
+            background: linear-gradient(180deg, var(--accent-cyan), var(--accent-green));
+            border-radius: 2px;
+        }
+        
+        /* 表单元素 */
+        .form-group {
+            margin-bottom: 28px;
+        }
+        
+        .form-label {
+            display: block;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-primary);
+            margin-bottom: 10px;
+            font-family: 'JetBrains Mono', monospace;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .form-input, .form-select {
+            width: 100%;
+            padding: 14px 18px;
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-size: 1rem;
+            font-family: 'Outfit', sans-serif;
+            transition: all 0.3s ease;
+            outline: none;
+        }
+        
+        .form-input:focus, .form-select:focus {
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 0 3px rgba(0, 217, 255, 0.1);
+        }
+        
+        .form-input::placeholder {
+            color: var(--text-secondary);
+        }
+        
+        .form-hint {
+            display: block;
+            margin-top: 8px;
+            font-size: 0.85rem;
+            color: var(--text-secondary);
+            font-family: 'JetBrains Mono', monospace;
+        }
+        
+        .form-hint code {
+            background: rgba(0, 217, 255, 0.1);
+            padding: 2px 8px;
+            border-radius: 4px;
+            color: var(--accent-cyan);
+        }
+        
+        /* 按钮组 */
+        .button-group {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 16px;
+            margin-top: 40px;
+        }
+        
+        .btn {
+            position: relative;
+            padding: 16px 32px;
+            font-size: 1rem;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            border: none;
+            border-radius: 12px;
+            cursor: pointer;
+            overflow: hidden;
+            transition: all 0.3s ease;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 10px;
+        }
+        
+        .btn::before {
+            content: '';
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            width: 0;
+            height: 0;
+            border-radius: 50%;
+            background: rgba(255, 255, 255, 0.3);
+            transform: translate(-50%, -50%);
+            transition: width 0.6s, height 0.6s;
+        }
+        
+        .btn:active::before {
+            width: 300px;
+            height: 300px;
+        }
+        
+        .btn-primary {
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-green));
+            color: var(--bg-primary);
+            box-shadow: 0 4px 20px rgba(0, 217, 255, 0.3);
+        }
+        
+        .btn-primary:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 30px rgba(0, 217, 255, 0.5);
+        }
+        
+        .btn-secondary {
+            background: rgba(139, 149, 176, 0.1);
+            color: var(--text-primary);
+            border: 1px solid var(--border-color);
+        }
+        
+        .btn-secondary:hover {
+            background: rgba(139, 149, 176, 0.2);
+            border-color: var(--text-secondary);
+        }
+        
+        .btn-success {
+            background: linear-gradient(135deg, var(--accent-green), #00cc70);
+            color: var(--bg-primary);
+            box-shadow: 0 4px 20px rgba(0, 255, 136, 0.3);
+        }
+        
+        .btn-success:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 30px rgba(0, 255, 136, 0.5);
+        }
+        
+        .btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+            transform: none !important;
+        }
+        
+        /* 加载动画 */
+        .loader {
+            width: 20px;
+            height: 20px;
+            border: 2px solid rgba(255, 255, 255, 0.3);
+            border-top-color: white;
+            border-radius: 50%;
+            animation: spin 0.8s linear infinite;
+        }
+        
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+        
+        /* 日志容器 */
+        .log-container {
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            padding: 20px;
+            max-height: 500px;
+            overflow-y: auto;
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 0.9rem;
+            line-height: 1.6;
+        }
+        
+        .log-container::-webkit-scrollbar {
+            width: 8px;
+        }
+        
+        .log-container::-webkit-scrollbar-track {
+            background: rgba(0, 0, 0, 0.2);
+            border-radius: 4px;
+        }
+        
+        .log-container::-webkit-scrollbar-thumb {
+            background: var(--accent-cyan);
+            border-radius: 4px;
+        }
+        
+        .log-line {
+            padding: 6px 0;
+            border-left: 2px solid transparent;
+            padding-left: 12px;
+            margin-bottom: 4px;
+            transition: all 0.2s ease;
+        }
+        
+        .log-line:hover {
+            background: rgba(0, 217, 255, 0.05);
+        }
+        
+        .log-line.info {
+            color: var(--text-secondary);
+        }
+        
+        .log-line.success {
+            color: var(--accent-green);
+            border-left-color: var(--accent-green);
+        }
+        
+        .log-line.error {
+            color: var(--accent-orange);
+            border-left-color: var(--accent-orange);
+        }
+        
+        .log-line.warning {
+            color: #ffd700;
+            border-left-color: #ffd700;
+        }
+        
+        /* 清空日志按钮 */
+        .clear-log-btn {
+            padding: 8px 16px;
+            background: rgba(255, 107, 53, 0.1);
+            border: 1px solid var(--accent-orange);
+            border-radius: 8px;
+            color: var(--accent-orange);
+            font-size: 0.85rem;
+            font-family: 'JetBrains Mono', monospace;
+            cursor: pointer;
+            transition: all 0.3s ease;
+        }
+        
+        .clear-log-btn:hover {
+            background: rgba(255, 107, 53, 0.2);
+            transform: translateY(-1px);
+        }
+        
+        /* 动画 */
+        @keyframes fadeInDown {
+            from {
+                opacity: 0;
+                transform: translateY(-30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        @keyframes fadeInUp {
+            from {
+                opacity: 0;
+                transform: translateY(30px);
+            }
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+        
+        .card:nth-child(1) { animation: fadeInUp 0.6s ease-out 0.1s both; }
+        .card:nth-child(2) { animation: fadeInUp 0.6s ease-out 0.2s both; }
+        
+        /* 响应式 */
+        @media (max-width: 768px) {
+            .header h1 {
+                font-size: 2rem;
+            }
+            
+            .card {
+                padding: 24px;
+            }
+            
+            .button-group {
+                grid-template-columns: 1fr;
+            }
+            
+            .theme-toggle-container {
+                top: 10px;
+                right: 10px;
+            }
+        }
+        
+        /* ==================== 登录页面样式 ==================== */
+        #loginPage {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: var(--bg-primary);
+            z-index: 2000;
+            justify-content: center;
+            align-items: center;
+        }
+        
+        .login-container {
+            background: var(--bg-card);
+            backdrop-filter: blur(20px);
+            border: 1px solid var(--border-color);
+            border-radius: 20px;
+            padding: 50px;
+            max-width: 450px;
+            width: 90%;
+            box-shadow: var(--shadow-glow);
+            animation: fadeInUp 0.6s ease-out;
+        }
+        
+        .login-container h1 {
+            font-family: 'JetBrains Mono', monospace;
+            font-size: 2rem;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-green));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            text-align: center;
+            margin-bottom: 10px;
+        }
+        
+        .login-container h2 {
+            font-size: 1.3rem;
+            color: var(--text-primary);
+            text-align: center;
+            margin-bottom: 30px;
+        }
+        
+        .login-container p {
+            color: var(--text-secondary);
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 0.95rem;
+        }
+        
+        .login-input {
+            width: 100%;
+            padding: 16px 20px;
+            padding-right: 50px;  /* 为眼睛图标留出空间 */
+            background: var(--bg-secondary);
+            border: 1px solid var(--border-color);
+            border-radius: 12px;
+            color: var(--text-primary);
+            font-size: 1rem;
+            font-family: 'Outfit', sans-serif;
+            margin-bottom: 16px;
+            transition: all 0.3s ease;
+            outline: none;
+        }
+        
+        .password-input-wrapper {
+            position: relative;
+            width: 100%;
+            margin-bottom: 16px;
+        }
+        
+        .password-input-wrapper .login-input {
+            margin-bottom: 0;
+        }
+        
+        .password-toggle {
+            position: absolute;
+            right: 12px;
+            top: 50%;
+            transform: translateY(-50%);
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 8px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            opacity: 0.6;
+            transition: opacity 0.3s ease;
+            font-size: 1.2rem;
+        }
+        
+        .password-toggle:hover {
+            opacity: 1;
+        }
+        
+        .password-toggle .eye-icon {
+            user-select: none;
+        }
+        
+        .login-input:focus {
+            border-color: var(--accent-cyan);
+            box-shadow: 0 0 0 3px rgba(0, 217, 255, 0.1);
+        }
+        
+        .login-btn {
+            width: 100%;
+            padding: 16px;
+            background: linear-gradient(135deg, var(--accent-cyan), var(--accent-green));
+            color: var(--bg-primary);
+            border: none;
+            border-radius: 12px;
+            font-size: 1rem;
+            font-weight: 600;
+            font-family: 'JetBrains Mono', monospace;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            box-shadow: 0 4px 20px rgba(0, 217, 255, 0.3);
+        }
+        
+        .login-btn:hover:not(:disabled) {
+            transform: translateY(-2px);
+            box-shadow: 0 6px 30px rgba(0, 217, 255, 0.5);
+        }
+        
+        .login-btn:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        
+        .login-error {
+            color: var(--accent-orange);
+            text-align: center;
+            margin-top: 16px;
+            font-size: 0.9rem;
+            font-family: 'JetBrains Mono', monospace;
+            min-height: 20px;
+        }
+        
+        .logout-btn {
+            position: fixed;
+            top: 70px;
+            right: 20px;
+            padding: 10px 20px;
+            background: rgba(255, 107, 53, 0.1);
+            border: 1px solid var(--accent-orange);
+            border-radius: 8px;
+            color: var(--accent-orange);
+            font-size: 0.85rem;
+            font-family: 'JetBrains Mono', monospace;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            z-index: 1000;
+        }
+        
+        .logout-btn:hover {
+            background: rgba(255, 107, 53, 0.2);
+            transform: translateY(-1px);
+        }
+        
+        #mainApp {
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <!-- 登录页面 -->
+    <div id="loginPage">
+        <div class="login-container">
+            <h1>IPv6 Token WebUI</h1>
+            
+            <!-- 首次设置模式 -->
+            <div id="setupMode" style="display: none;">
+                <h2>首次设置</h2>
+                <p>欢迎使用！请设置初始密码（至少 6 位）</p>
+                <div class="password-input-wrapper">
+                    <input type="password" id="setupPassword" class="login-input" placeholder="输入密码" autocomplete="new-password">
+                    <button type="button" class="password-toggle" onclick="togglePasswordVisibility('setupPassword')" tabindex="-1">
+                        <span class="eye-icon">👁️</span>
+                    </button>
+                </div>
+                <div class="password-input-wrapper">
+                    <input type="password" id="setupPasswordConfirm" class="login-input" placeholder="确认密码" autocomplete="new-password">
+                    <button type="button" class="password-toggle" onclick="togglePasswordVisibility('setupPasswordConfirm')" tabindex="-1">
+                        <span class="eye-icon">👁️</span>
+                    </button>
+                </div>
+                <button onclick="setupPassword()" class="login-btn">设置密码</button>
+                <div id="setupError" class="login-error"></div>
+            </div>
+            
+            <!-- 登录模式 -->
+            <div id="loginMode" style="display: none;">
+                <h2>登录</h2>
+                <p>请输入密码以继续</p>
+                <div class="password-input-wrapper">
+                    <input type="password" id="loginPassword" class="login-input" placeholder="输入密码" autocomplete="current-password">
+                    <button type="button" class="password-toggle" onclick="togglePasswordVisibility('loginPassword')" tabindex="-1">
+                        <span class="eye-icon">👁️</span>
+                    </button>
+                </div>
+                <button onclick="login()" class="login-btn">登录</button>
+                <div id="loginError" class="login-error"></div>
+            </div>
+        </div>
+    </div>
+    
+    <!-- 主应用 -->
+    <div id="mainApp">
+    <!-- 主题切换开关 -->
+    <div class="theme-toggle-container">
+        <div class="theme-toggle" id="themeToggle">
+            <div class="theme-toggle-slider">🌙</div>
+        </div>
+    </div>
+    
+    <!-- 登出按钮 -->
+    <button onclick="logout()" class="logout-btn">🚪 登出</button>
+    
+    <!-- 装饰性发光球体 -->
+    <div class="orb orb-1"></div>
+    <div class="orb orb-2"></div>
+    
+    <div class="container"></div>
+        <!-- 标题区域 -->
+        <header class="header">
+            <h1>IPv6 Token WebUI</h1>
+            <p class="subtitle">为 Linux NetworkManager 配置自定义固定 IPv6 后缀</p>
+            <span class="status-badge">● SYSTEM READY</span>
+        </header>
+        
+        <!-- Token 配置卡片 -->
+        <div class="card">
+            <h2 class="card-title">配置面板</h2>
+            
+            <form id="tokenForm">
+                <!-- NetworkManager 连接 -->
+                <div class="form-group">
+                    <label class="form-label">NetworkManager 连接</label>
+                    <select id="connectionSelect" class="form-select">
+                        <option value="">⟳ 正在加载系统信息...</option>
+                    </select>
+                    <input type="text" id="connectionManual" class="form-input" 
+                           placeholder="或手动输入连接名称" style="margin-top: 12px;">
+                    <span class="form-hint">💡 运行 <code>nmcli connection show</code> 查看可用连接</span>
+                </div>
+                
+                <!-- 网卡接口 -->
+                <div class="form-group">
+                    <label class="form-label">网卡接口</label>
+                    <select id="interfaceSelect" class="form-select">
+                        <option value="">⟳ 正在加载系统信息...</option>
+                    </select>
+                    <input type="text" id="interfaceManual" class="form-input" 
+                           placeholder="或手动输入接口名称" style="margin-top: 12px;">
+                    <span class="form-hint">💡 运行 <code>ip link show</code> 查看可用接口</span>
+                </div>
+                
+                <!-- 网络信息卡片 -->
+                <div class="form-group" style="background: rgba(0, 217, 255, 0.05); padding: 20px; border-radius: 12px; border: 1px solid var(--border-color);">
+                    <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 15px;">
+                        <label class="form-label" style="margin-bottom: 0;">📡 网络信息</label>
+                        <button type="button" id="refreshPrefixBtn" class="clear-log-btn" style="padding: 6px 12px; font-size: 0.8rem;">
+                            🔄 刷新
+                        </button>
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 15px;">
+                        <div>
+                            <span style="font-size: 0.85rem; color: var(--text-secondary);">检测到的前缀长度:</span>
+                            <div id="detectedPrefix" style="font-size: 1.1rem; font-weight: 600; color: var(--accent-cyan); margin-top: 5px;">
+                                检测中...
+                            </div>
+                        </div>
+                        <div>
+                            <span style="font-size: 0.85rem; color: var(--text-secondary);">建议后缀长度:</span>
+                            <div id="suggestedSuffix" style="font-size: 1.1rem; font-weight: 600; color: var(--accent-green); margin-top: 5px;">
+                                检测中...
+                            </div>
+                        </div>
+                    </div>
+                    <div id="prefixWarning" style="margin-top: 10px; font-size: 0.85rem; color: var(--accent-orange); display: none;"></div>
+                </div>
+                
+                <!-- 后缀长度选择 -->
+                <div class="form-group">
+                    <label class="form-label">后缀长度选择</label>
+                    <select id="suffixLength" class="form-select" onchange="updateTokenHint()">
+                        <option value="16">16 位 (::xxxx)</option>
+                        <option value="32">32 位 (::xxxx:xxxx)</option>
+                        <option value="64" selected>64 位 (::xxxx:xxxx:xxxx:xxxx)</option>
+                    </select>
+                    <span class="form-hint">选择 Token 后缀的位数，通常使用 64 位</span>
+                </div>
+                
+                <!-- Token 后缀 -->
+                <div class="form-group">
+                    <label class="form-label">Token 后缀</label>
+                    <input type="text" id="tokenInput" class="form-input" 
+                           value="::888" placeholder="例如: ::888"
+                           oninput="validateTokenRealtime()">
+                    <span id="tokenHint" class="form-hint">
+                        支持格式: <code>::xxxx</code> 或 <code>::xxxx:xxxx:xxxx:xxxx</code>
+                    </span>
+                    <div id="tokenValidation" style="margin-top: 8px; font-size: 0.85rem; display: none;"></div>
+                </div>
+                
+                <!-- 隐私模式 -->
+                <div class="form-group">
+                    <label class="form-label">隐私模式</label>
+                    <select id="privacyMode" class="form-select">
+                        <option value="0">0 - 禁用临时 IPv6</option>
+                        <option value="2" selected>2 - 启用临时 IPv6 优先出站 (推荐)</option>
+                    </select>
+                    <span class="form-hint">推荐模式 2，兼顾固定地址和隐私保护</span>
+                </div>
+                
+                <!-- 操作按钮 -->
+                <div class="button-group">
+                    <button type="button" id="enableBtn" class="btn btn-primary">
+                        <span>▶</span>
+                        <span>启用 Token</span>
+                    </button>
+                    <button type="button" id="disableBtn" class="btn btn-secondary">
+                        <span>■</span>
+                        <span>禁用 Token</span>
+                    </button>
+                    <button type="button" id="checkBtn" class="btn btn-success">
+                        <span>◆</span>
+                        <span>检查状态</span>
+                    </button>
+                </div>
+            </form>
+        </div>
+        
+        <!-- 操作日志卡片 -->
+        <div class="card">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 20px;">
+                <h2 class="card-title" style="margin-bottom: 0;">系统日志</h2>
+                <button id="clearLogBtn" class="clear-log-btn">清空日志</button>
+            </div>
+            <div id="logContainer" class="log-container">
+                <div class="log-line info">等待操作...</div>
+            </div>
+        </div>
+    </div>
+    </div>
+    
+    <script>
+        // 全局状态
+        let systemInfo = null;
+        let isAuthenticated = false;
+        
+        // 主题切换
+        const themeToggle = document.getElementById('themeToggle');
+        const html = document.documentElement;
+        const themeSlider = themeToggle.querySelector('.theme-toggle-slider');
+        
+        // 从 localStorage 加载主题
+        const savedTheme = localStorage.getItem('theme') || 'dark';
+        html.setAttribute('data-theme', savedTheme);
+        if (savedTheme === 'light') {
+            themeToggle.classList.add('light');
+            themeSlider.textContent = '☀️';
+        }
+        
+        // 主题切换事件
+        themeToggle.addEventListener('click', () => {
+            const currentTheme = html.getAttribute('data-theme');
+            const newTheme = currentTheme === 'dark' ? 'light' : 'dark';
+            
+            html.setAttribute('data-theme', newTheme);
+            localStorage.setItem('theme', newTheme);
+            
+            if (newTheme === 'light') {
+                themeToggle.classList.add('light');
+                themeSlider.textContent = '☀️';
+            } else {
+                themeToggle.classList.remove('light');
+                themeSlider.textContent = '🌙';
+            }
+        });
+        
+        // 页面加载时检查认证状态
+        window.addEventListener('DOMContentLoaded', async () => {
+            await checkAuthStatus();
+        });
+        
+        // ==================== 认证相关函数 ====================
+        
+        // 切换密码可见性
+        function togglePasswordVisibility(inputId) {
+            const input = document.getElementById(inputId);
+            const button = input.parentElement.querySelector('.password-toggle');
+            const icon = button.querySelector('.eye-icon');
+            
+            if (input.type === 'password') {
+                input.type = 'text';
+                icon.textContent = '🙈';  // 闭眼图标
+            } else {
+                input.type = 'password';
+                icon.textContent = '👁️';  // 睁眼图标
+            }
+        }
+        
+        // 为所有密码输入框添加失去焦点时自动隐藏功能
+        document.addEventListener('DOMContentLoaded', function() {
+            const passwordInputs = ['setupPassword', 'setupPasswordConfirm', 'loginPassword'];
+            
+            passwordInputs.forEach(inputId => {
+                const input = document.getElementById(inputId);
+                if (input) {
+                    input.addEventListener('blur', function() {
+                        // 失去焦点后延迟隐藏密码（给用户时间点击眼睛图标）
+                        setTimeout(() => {
+                            if (input.type === 'text') {
+                                input.type = 'password';
+                                const button = input.parentElement.querySelector('.password-toggle');
+                                if (button) {
+                                    const icon = button.querySelector('.eye-icon');
+                                    if (icon) {
+                                        icon.textContent = '👁️';
+                                    }
+                                }
+                            }
+                        }, 200);
+                    });
+                }
+            });
+        });
+        
+        // 检查认证状态
+        async function checkAuthStatus() {
+            try {
+                const sessionId = localStorage.getItem('sessionId');
+                const response = await fetch('/api/auth/status', {
+                    headers: sessionId ? { 'Authorization': `Bearer ${sessionId}` } : {}
+                });
+                const data = await response.json();
+                
+                if (data.success && data.data) {
+                    if (data.data.needs_setup) {
+                        showSetupPage();
+                    } else if (data.data.authenticated) {
+                        isAuthenticated = true;
+                        showMainApp();
+                        await loadSystemInfo();
+                    } else {
+                        showLoginPage();
+                    }
+                } else {
+                    showLoginPage();
+                }
+            } catch (error) {
+                console.error('认证检查失败:', error);
+                showLoginPage();
+            }
+        }
+        
+        // 显示设置页面
+        function showSetupPage() {
+            document.getElementById('loginPage').style.display = 'flex';
+            document.getElementById('setupMode').style.display = 'block';
+            document.getElementById('loginMode').style.display = 'none';
+            document.getElementById('mainApp').style.display = 'none';
+        }
+        
+        // 显示登录页面
+        function showLoginPage() {
+            document.getElementById('loginPage').style.display = 'flex';
+            document.getElementById('setupMode').style.display = 'none';
+            document.getElementById('loginMode').style.display = 'block';
+            document.getElementById('mainApp').style.display = 'none';
+            document.getElementById('loginError').textContent = '';
+        }
+        
+        // 显示主应用
+        function showMainApp() {
+            document.getElementById('loginPage').style.display = 'none';
+            document.getElementById('mainApp').style.display = 'block';
+        }
+        
+        // 初始密码设置
+        async function setupPassword() {
+            const password = document.getElementById('setupPassword').value;
+            const confirm = document.getElementById('setupPasswordConfirm').value;
+            const errorDiv = document.getElementById('setupError');
+            
+            if (password.length < 6) {
+                errorDiv.textContent = '密码至少需要 6 位';
+                return;
+            }
+            
+            if (password !== confirm) {
+                errorDiv.textContent = '两次输入的密码不一致';
+                return;
+            }
+            
+            const btn = event.target;
+            btn.disabled = true;
+            btn.textContent = '设置中...';
+            
+            try {
+                const response = await fetch('/api/auth/setup', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password })
+                });
+                
+                const data = await response.json();
+                if (data.success && data.data) {
+                    localStorage.setItem('sessionId', data.data.session_id);
+                    isAuthenticated = true;
+                    showMainApp();
+                    await loadSystemInfo();
+                } else {
+                    errorDiv.textContent = data.error || '设置失败';
+                }
+            } catch (error) {
+                errorDiv.textContent = '网络错误: ' + error.message;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '设置密码';
+            }
+        }
+        
+        // 登录
+        async function login() {
+            const password = document.getElementById('loginPassword').value;
+            const errorDiv = document.getElementById('loginError');
+            
+            if (!password) {
+                errorDiv.textContent = '请输入密码';
+                return;
+            }
+            
+            const btn = event.target;
+            btn.disabled = true;
+            btn.textContent = '登录中...';
+            
+            try {
+                const response = await fetch('/api/auth/login', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ password })
+                });
+                
+                const data = await response.json();
+                if (data.success && data.data) {
+                    localStorage.setItem('sessionId', data.data.session_id);
+                    isAuthenticated = true;
+                    showMainApp();
+                    await loadSystemInfo();
+                } else {
+                    errorDiv.textContent = data.error || '登录失败';
+                    document.getElementById('loginPassword').value = '';
+                }
+            } catch (error) {
+                errorDiv.textContent = '网络错误: ' + error.message;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = '登录';
+            }
+        }
+        
+        // 登出
+        async function logout() {
+            const sessionId = localStorage.getItem('sessionId');
+            if (sessionId) {
+                try {
+                    await fetch('/api/auth/logout', {
+                        method: 'POST',
+                        headers: { 'Authorization': `Bearer ${sessionId}` }
+                    });
+                } catch (error) {
+                    console.error('登出请求失败:', error);
+                }
+            }
+            localStorage.removeItem('sessionId');
+            isAuthenticated = false;
+            showLoginPage();
+        }
+        
+        // 带认证的 API 请求包装器
+        async function apiRequest(url, options = {}) {
+            const sessionId = localStorage.getItem('sessionId');
+            options.headers = {
+                ...options.headers,
+                'Authorization': `Bearer ${sessionId}`
+            };
+            
+            const response = await fetch(url, options);
+            
+            // 检测 401 响应
+            if (response.status === 401) {
+                localStorage.removeItem('sessionId');
+                isAuthenticated = false;
+                showLoginPage();
+                throw new Error('会话已过期，请重新登录');
+            }
+            
+            return response;
+        }
+        
+        // 加载系统信息
+        async function loadSystemInfo() {
+            try {
+                addLog('⟳ 正在获取系统信息...', 'info');
+                
+                const response = await apiRequest('/api/system/info');
+                const data = await response.json();
+                
+                if (data.success) {
+                    systemInfo = data.data;
+                    populateSelects();
+                    addLog('✓ 系统信息加载成功', 'success');
+                    
+                    // 自动刷新前缀信息
+                    await refreshPrefixInfo();
+                } else {
+                    addLog('✗ 获取系统信息失败: ' + data.error, 'error');
+                }
+            } catch (error) {
+                addLog('✗ 网络错误: ' + error.message, 'error');
+                if (error.message.includes('会话已过期')) {
+                    addLog('⚠ 会话已过期，请重新登录', 'warning');
+                } else {
+                    addLog('⚠ 提示: 请确保后端服务正在运行', 'warning');
+                }
+            }
+        }
+        
+        // ==================== Token 格式增强功能 ====================
+        
+        // 刷新前缀信息
+        async function refreshPrefixInfo() {
+            const interfaceName = getInterfaceName();
+            
+            if (!interfaceName) {
+                document.getElementById('detectedPrefix').textContent = '请先选择接口';
+                document.getElementById('suggestedSuffix').textContent = '请先选择接口';
+                return;
+            }
+            
+            try {
+                const response = await apiRequest(`/api/ipv6/prefix-info?interface=${encodeURIComponent(interfaceName)}`);
+                const data = await response.json();
+                
+                if (data.success && data.data) {
+                    const info = data.data;
+                    
+                    // 更新显示
+                    document.getElementById('detectedPrefix').textContent = `/${info.detected_prefix_length}`;
+                    document.getElementById('suggestedSuffix').textContent = `${info.suggested_suffix_length} 位`;
+                    
+                    // 显示警告（如果有）
+                    const warningDiv = document.getElementById('prefixWarning');
+                    if (info.warning) {
+                        warningDiv.textContent = '⚠️ ' + info.warning;
+                        warningDiv.style.display = 'block';
+                    } else {
+                        warningDiv.style.display = 'none';
+                    }
+                    
+                    // 自动设置建议的后缀长度
+                    const suffixSelect = document.getElementById('suffixLength');
+                    if (info.suggested_suffix_length <= 16) {
+                        suffixSelect.value = '16';
+                    } else if (info.suggested_suffix_length <= 32) {
+                        suffixSelect.value = '32';
+                    } else {
+                        suffixSelect.value = '64';
+                    }
+                    
+                    updateTokenHint();
+                }
+            } catch (error) {
+                console.error('刷新前缀信息失败:', error);
+                document.getElementById('detectedPrefix').textContent = '检测失败';
+                document.getElementById('suggestedSuffix').textContent = '检测失败';
+            }
+        }
+        
+        // 更新 Token 提示
+        function updateTokenHint() {
+            const suffixLength = document.getElementById('suffixLength').value;
+            const hintSpan = document.getElementById('tokenHint');
+            
+            // 清空现有内容
+            hintSpan.textContent = '';
+            
+            let formatText, exampleText;
+            switch(suffixLength) {
+                case '16':
+                    formatText = '支持格式: ::xxxx';
+                    exampleText = '例如: ::888, ::1234';
+                    break;
+                case '32':
+                    formatText = '支持格式: ::xxxx:xxxx';
+                    exampleText = '例如: ::1234:5678';
+                    break;
+                case '64':
+                    formatText = '支持格式: ::xxxx:xxxx:xxxx:xxxx';
+                    exampleText = '例如: ::1234:5678:abcd:ef01';
+                    break;
+            }
+            
+            // 使用 DOM 操作代替 innerHTML（更安全）
+            const formatCode = document.createElement('code');
+            formatCode.textContent = formatText.replace('支持格式: ', '');
+            
+            const exampleCode = document.createElement('code');
+            exampleCode.textContent = exampleText.replace('例如: ', '');
+            
+            hintSpan.appendChild(document.createTextNode('支持格式: '));
+            hintSpan.appendChild(formatCode);
+            hintSpan.appendChild(document.createElement('br'));
+            hintSpan.appendChild(document.createTextNode(exampleText.split(':')[0] + ': '));
+            hintSpan.appendChild(exampleCode);
+            
+            // 重新验证当前输入
+            validateTokenRealtime();
+        }
+        
+        // 实时验证 Token
+        function validateTokenRealtime() {
+            const tokenInput = document.getElementById('tokenInput');
+            const token = tokenInput.value.trim();
+            const validationDiv = document.getElementById('tokenValidation');
+            
+            if (!token) {
+                tokenInput.style.borderColor = '';
+                validationDiv.style.display = 'none';
+                return;
+            }
+            
+            // 基本格式验证
+            const tokenRegex = /^::[0-9a-fA-F:]+$/;
+            if (!tokenRegex.test(token)) {
+                tokenInput.style.borderColor = 'var(--accent-orange)';
+                validationDiv.textContent = '❌ 格式错误：Token 必须以 :: 开头，后跟十六进制字符';
+                validationDiv.style.color = 'var(--accent-orange)';
+                validationDiv.style.display = 'block';
+                return;
+            }
+            
+            // 计算 Token 位数
+            const hexPart = token.replace(/:/g, '');
+            const bits = hexPart.length * 4;
+            const suffixLength = parseInt(document.getElementById('suffixLength').value);
+            
+            // 验证长度
+            if (bits > suffixLength) {
+                tokenInput.style.borderColor = 'var(--accent-orange)';
+                validationDiv.textContent = `⚠️ Token 过长：当前 ${bits} 位，建议不超过 ${suffixLength} 位`;
+                validationDiv.style.color = 'var(--accent-orange)';
+                validationDiv.style.display = 'block';
+                return;
+            }
+            
+            // 验证通过
+            tokenInput.style.borderColor = 'var(--accent-green)';
+            validationDiv.textContent = `✓ 格式正确 (${bits} 位)`;
+            validationDiv.style.color = 'var(--accent-green)';
+            validationDiv.style.display = 'block';
+        }
+        
+        // 填充下拉列表
+        function populateSelects() {
+            const connectionSelect = document.getElementById('connectionSelect');
+            const interfaceSelect = document.getElementById('interfaceSelect');
+            
+            // 清空现有选项
+            connectionSelect.innerHTML = '<option value="">-- 请选择连接 --</option>';
+            interfaceSelect.innerHTML = '<option value="">-- 请选择接口 --</option>';
+            
+            // 填充连接列表
+            if (systemInfo.connections && systemInfo.connections.length > 0) {
+                systemInfo.connections.forEach(conn => {
+                    const option = document.createElement('option');
+                    option.value = conn.name;
+                    option.textContent = `${conn.name} (${conn.conn_type})${conn.device ? ' → ' + conn.device : ''}`;
+                    connectionSelect.appendChild(option);
+                });
+            } else {
+                connectionSelect.innerHTML = '<option value="">未检测到连接</option>';
+            }
+            
+            // 填充接口列表
+            if (systemInfo.interfaces && systemInfo.interfaces.length > 0) {
+                systemInfo.interfaces.forEach(iface => {
+                    const option = document.createElement('option');
+                    option.value = iface.name;
+                    const status = iface.is_up ? '●' : '○';
+                    const mac = iface.mac ? ` [${iface.mac}]` : '';
+                    option.textContent = `${status} ${iface.name}${mac}`;
+                    interfaceSelect.appendChild(option);
+                });
+            } else {
+                interfaceSelect.innerHTML = '<option value="">未检测到接口</option>';
+            }
+        }
+        
+        // 获取连接名称
+        function getConnectionName() {
+            const select = document.getElementById('connectionSelect').value;
+            const manual = document.getElementById('connectionManual').value.trim();
+            return select || manual;
+        }
+        
+        // 获取接口名称
+        function getInterfaceName() {
+            const select = document.getElementById('interfaceSelect').value;
+            const manual = document.getElementById('interfaceManual').value.trim();
+            return select || manual;
+        }
+        
+        // 启用 Token
+        document.getElementById('enableBtn').addEventListener('click', async () => {
+            const connectionName = getConnectionName();
+            const interfaceName = getInterfaceName();
+            const token = document.getElementById('tokenInput').value.trim();
+            const privacyMode = parseInt(document.getElementById('privacyMode').value);
+            
+            if (!connectionName || !interfaceName || !token) {
+                addLog('✗ 请填写所有必填字段', 'error');
+                return;
+            }
+            
+            const btn = document.getElementById('enableBtn');
+            const originalHTML = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<div class="loader"></div><span>处理中...</span>';
+            
+            try {
+                addLog('▶ 正在启用 Token...', 'info');
+                
+                const response = await apiRequest('/api/ipv6/enable-token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        connection_name: connectionName,
+                        interface: interfaceName,
+                        token: token,
+                        privacy_mode: privacyMode
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success && data.data) {
+                    if (data.data.success) {
+                        addLog('✓ ' + data.data.message, 'success');
+                        if (data.data.logs) {
+                            data.data.logs.forEach(log => {
+                                const type = log.includes('✅') || log.includes('✓') ? 'success' :
+                                           log.includes('❌') || log.includes('✗') ? 'error' :
+                                           log.includes('⚠️') || log.includes('⚠') ? 'warning' : 'info';
+                                addLog(log, type);
+                            });
+                        }
+                    } else {
+                        addLog('⚠ ' + data.data.message, 'warning');
+                        if (data.data.logs) {
+                            data.data.logs.forEach(log => addLog(log, 'warning'));
+                        }
+                    }
+                } else {
+                    addLog('✗ 操作失败: ' + (data.error || '未知错误'), 'error');
+                }
+            } catch (error) {
+                addLog('✗ 网络错误: ' + error.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHTML;
+            }
+        });
+        
+        // 禁用 Token
+        document.getElementById('disableBtn').addEventListener('click', async () => {
+            const connectionName = getConnectionName();
+            const interfaceName = getInterfaceName();
+            
+            if (!connectionName || !interfaceName) {
+                addLog('✗ 请选择连接和接口', 'error');
+                return;
+            }
+            
+            const btn = document.getElementById('disableBtn');
+            const originalHTML = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<div class="loader"></div><span>处理中...</span>';
+            
+            try {
+                addLog('■ 正在禁用 Token...', 'info');
+                
+                const response = await apiRequest('/api/ipv6/disable-token', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        connection_name: connectionName,
+                        interface: interfaceName
+                    })
+                });
+                
+                const data = await response.json();
+                
+                if (data.success && data.data) {
+                    addLog('✓ ' + data.data.message, 'success');
+                    if (data.data.logs) {
+                        data.data.logs.forEach(log => {
+                            const type = log.includes('✅') || log.includes('✓') ? 'success' :
+                                       log.includes('❌') || log.includes('✗') ? 'error' :
+                                       log.includes('⚠️') || log.includes('⚠') ? 'warning' : 'info';
+                            addLog(log, type);
+                        });
+                    }
+                } else {
+                    addLog('✗ 操作失败: ' + (data.error || '未知错误'), 'error');
+                }
+            } catch (error) {
+                addLog('✗ 网络错误: ' + error.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHTML;
+            }
+        });
+        
+        // 检查状态
+        document.getElementById('checkBtn').addEventListener('click', async () => {
+            const connectionName = getConnectionName();
+            const interfaceName = getInterfaceName();
+            
+            if (!connectionName || !interfaceName) {
+                addLog('✗ 请选择连接和接口', 'error');
+                return;
+            }
+            
+            const btn = document.getElementById('checkBtn');
+            const originalHTML = btn.innerHTML;
+            btn.disabled = true;
+            btn.innerHTML = '<div class="loader"></div><span>检查中...</span>';
+            
+            try {
+                addLog('◆ 正在检查状态...', 'info');
+                
+                const response = await apiRequest(`/api/ipv6/check?connection_name=${encodeURIComponent(connectionName)}&interface=${encodeURIComponent(interfaceName)}`);
+                const data = await response.json();
+                
+                if (data.success && data.data) {
+                    const status = data.data;
+                    addLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
+                    addLog('📊 Token 状态报告', 'success');
+                    addLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
+                    addLog(`  NetworkManager Token: ${status.nm_token || '未配置'}`, 'info');
+                    addLog(`  内核 Token: ${status.kernel_token || '未检测到'}`, 'info');
+                    addLog(`  地址生成模式: ${status.addr_gen_mode || 'N/A'}`, 'info');
+                    addLog(`  隐私模式: ${status.privacy_mode || 'N/A'}`, 'info');
+                    
+                    if (status.addresses && status.addresses.length > 0) {
+                        addLog(`  IPv6 地址 (${status.addresses.length} 个):`, 'info');
+                        status.addresses.forEach(addr => {
+                            const temp = addr.is_temporary ? ' [临时]' : '';
+                            addLog(`    → ${addr.address}/${addr.prefix_len} ${addr.scope}${temp}`, 'success');
+                        });
+                    } else {
+                        addLog('  ⚠ 未检测到 IPv6 地址', 'warning');
+                    }
+                    addLog('━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━', 'info');
+                } else {
+                    addLog('✗ 检查失败: ' + (data.error || '未知错误'), 'error');
+                }
+            } catch (error) {
+                addLog('✗ 网络错误: ' + error.message, 'error');
+            } finally {
+                btn.disabled = false;
+                btn.innerHTML = originalHTML;
+            }
+        });
+        
+        // 清空日志
+        document.getElementById('clearLogBtn').addEventListener('click', () => {
+            document.getElementById('logContainer').innerHTML = '<div class="log-line info">日志已清空</div>';
+        });
+        
+        // 刷新前缀信息按钮
+        document.getElementById('refreshPrefixBtn').addEventListener('click', refreshPrefixInfo);
+        
+        // 接口选择变化时自动刷新前缀信息
+        document.getElementById('interfaceSelect').addEventListener('change', refreshPrefixInfo);
+        
+        // 添加日志
+        function addLog(message, type = 'info') {
+            const container = document.getElementById('logContainer');
+            const line = document.createElement('div');
+            line.className = `log-line ${type}`;
+            line.textContent = message;
+            container.appendChild(line);
+            container.scrollTop = container.scrollHeight;
+        }
+    </script>
+</body>
+</html>
